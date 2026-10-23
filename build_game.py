@@ -17,6 +17,8 @@ for c in d['countries']:
         'color': '#%06X' % (c['color'] & 0xFFFFFF),
         'tank': c['equip']['tank'], 'arty': c['equip']['arty'],
         'bloc': c['equip']['bloc'],
+        'uniform': '#%06X' % (c['equip']['uniform'] & 0xFFFFFF),
+        'helmet': '#%06X' % (c['equip']['helmet'] & 0xFFFFFF),
         'capital': '',
     })
 hexes = []

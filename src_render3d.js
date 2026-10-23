@@ -158,6 +158,25 @@ function initGL(){
       vertexColors: true, side: THREE.DoubleSide}));
     bordersMesh.renderOrder = 4;
     scene.add(bordersMesh);
+    // ---- 3D unit figures (instanced primitive parts) ----
+    function partMesh(geo, hexColor){
+      const m = new THREE.InstancedMesh(geo,
+        new THREE.MeshLambertMaterial({color: hexColor}), N);
+      m.count = 0;
+      scene.add(m);
+      return m;
+    }
+    const parts = {
+      solBody: partMesh(new THREE.CylinderGeometry(0.52, 0.66, 1.55, 6), 0xffffff),
+      solHead: partMesh(new THREE.SphereGeometry(0.40, 8, 6), 0xc68863),
+      solHelmet: partMesh(new THREE.SphereGeometry(0.48, 8, 5, 0, Math.PI * 2, 0, 1.85), 0xffffff),
+      tankHull: partMesh(new THREE.BoxGeometry(2.8, 0.78, 1.6), 0xffffff),
+      tankTurret: partMesh(new THREE.CylinderGeometry(0.70, 0.82, 0.52, 8), 0xffffff),
+      tankBarrel: partMesh(new THREE.CylinderGeometry(0.09, 0.11, 2.1, 5), 0xffffff),
+      artyBase: partMesh(new THREE.BoxGeometry(1.8, 0.42, 1.2), 0xffffff),
+      artyBarrel: partMesh(new THREE.CylinderGeometry(0.12, 0.16, 2.4, 5), 0x3d473a),
+      artyShield: partMesh(new THREE.BoxGeometry(1.55, 0.95, 0.14), 0xffffff),
+    };
     // ---- general stars ----
     const starMesh = new THREE.InstancedMesh(
       new THREE.OctahedronGeometry(1.65),
@@ -179,14 +198,14 @@ function initGL(){
     const distH = (D.H * 0.60) / tanV;
     const distW = (D.W * 0.52) / (tanV * aspect0);
     const dist0 = Math.min(3300, Math.max(distH, distW) * 1.04);
-    gl = { renderer, scene, camera, boardGeo, numGeo, bordersGeo, starMesh, hlGeo,
+    gl = { renderer, scene, camera, boardGeo, numGeo, bordersGeo, starMesh, hlGeo, parts,
            target, dist: dist0, pitch: 0.94, dummy, maxBorders: MAXB };
     onResize();
     (function loop(){
       requestAnimationFrame(loop);
       if (needRender && gl){ needRender = false; gl.renderer.render(gl.scene, gl.camera); }
     })();
-    refreshColors(); refreshNumbers(); refreshBorders(); refreshStars(); refreshHighlights();
+    refreshColors(); refreshNumbers(); refreshBorders(); refreshUnits(); refreshStars(); refreshHighlights();
     updateCamera();
   } catch(e){ glFailed = true; }
 }
@@ -214,7 +233,7 @@ function refreshColors(){
 function refreshNumbers(){
   if (!gl) return;
   const posA = gl.numGeo.getAttribute('position'), uvA = gl.numGeo.getAttribute('uv');
-  const pos = posA.array, uv = uvA.array, W2 = 5.4;
+  const pos = posA.array, uv = uvA.array, W2 = 4.1;
   for (let i = 0; i < N; i++){
     const h = D.hexes[i], st = strength(i);
     const p = i * 18, q = i * 12;
@@ -224,7 +243,7 @@ function refreshNumbers(){
     }
     const n = Math.min(63, st), col = n % 8, row = Math.floor(n / 8);
     const u0 = col / 8, u1 = (col + 1) / 8, vT = 1 - row / 8, vB = 1 - (row + 1) / 8;
-    const y = hTop(i) + 0.12, x = h[0], z = h[1];
+    const y = hTop(i) + 0.12, x = h[0] - 5.3, z = h[1] - 5.0;
     const quad = [
       [x - W2, z - W2, u0, vT], [x + W2, z - W2, u1, vT], [x + W2, z + W2, u1, vB],
       [x - W2, z - W2, u0, vT], [x + W2, z + W2, u1, vB], [x - W2, z + W2, u0, vB]];
@@ -289,6 +308,60 @@ function refreshHighlights(){
   posA.needsUpdate = true; colA.needsUpdate = true;
   needRender = true;
 }
+function setInst(mesh, idx, x, y, z, rx, ry, rz){
+  const d = gl.dummy;
+  d.position.set(x, y, z); d.rotation.set(rx, ry, rz); d.scale.set(1, 1, 1);
+  d.updateMatrix(); mesh.setMatrixAt(idx, d.matrix);
+}
+function refreshUnits(){
+  if (!gl || !gl.parts) return;
+  const P = gl.parts;
+  const counts = {solBody: 0, solHead: 0, solHelmet: 0, tankHull: 0, tankTurret: 0,
+                  tankBarrel: 0, artyBase: 0, artyBarrel: 0, artyShield: 0};
+  const colTmp = new THREE.Color();
+  function paint(mesh, idx, hex, mul){
+    colTmp.set(hex);
+    if (mul) colTmp.multiplyScalar(mul);
+    mesh.setColorAt(idx, colTmp);
+  }
+  for (let i = 0; i < N; i++){
+    if (S.inf[i] + S.art[i] + S.tank[i] === 0) continue;
+    const h = D.hexes[i], y = hTop(i), C = D.countries[S.owner[i]];
+    if (S.tank[i] > 0){
+      const fx = h[0] - 3.3, fz = h[1] - 1.6;
+      let j = counts.tankHull++;
+      setInst(P.tankHull, j, fx, y + 0.62, fz, 0, 0, 0); paint(P.tankHull, j, C.uniform, 0.85);
+      j = counts.tankTurret++;
+      setInst(P.tankTurret, j, fx - 0.25, y + 1.28, fz, 0, 0, 0); paint(P.tankTurret, j, C.uniform, 0.95);
+      j = counts.tankBarrel++;
+      setInst(P.tankBarrel, j, fx + 1.35, y + 1.3, fz, 0, 0, Math.PI / 2); paint(P.tankBarrel, j, C.uniform, 0.7);
+    }
+    if (S.art[i] > 0){
+      const fx = h[0] + 3.4, fz = h[1] - 1.4;
+      let j = counts.artyBase++;
+      setInst(P.artyBase, j, fx, y + 0.24, fz, 0, 0, 0); paint(P.artyBase, j, C.uniform, 0.75);
+      j = counts.artyShield++;
+      setInst(P.artyShield, j, fx - 0.55, y + 0.85, fz, 0, 0, 0); paint(P.artyShield, j, C.uniform, 0.9);
+      j = counts.artyBarrel++;
+      setInst(P.artyBarrel, j, fx + 0.35, y + 1.25, fz, 0, 0, -0.85);
+    }
+    if (S.inf[i] > 0){
+      const fx = h[0], fz = h[1] + 2.6;
+      let j = counts.solBody++;
+      setInst(P.solBody, j, fx, y + 1.0, fz, 0, 0, 0); paint(P.solBody, j, C.uniform, 1);
+      j = counts.solHead++;
+      setInst(P.solHead, j, fx, y + 2.05, fz, 0, 0, 0);
+      j = counts.solHelmet++;
+      setInst(P.solHelmet, j, fx, y + 2.14, fz, 0, 0, 0); paint(P.solHelmet, j, C.helmet, 1);
+    }
+  }
+  for (const k in P){
+    P[k].count = counts[k];
+    P[k].instanceMatrix.needsUpdate = true;
+    if (P[k].instanceColor) P[k].instanceColor.needsUpdate = true;
+  }
+  needRender = true;
+}
 function refreshBorders(){
   if (!gl) return;
   const posA = gl.bordersGeo.getAttribute('position'), colA = gl.bordersGeo.getAttribute('color');
@@ -332,7 +405,7 @@ function refreshBorders(){
 function syncScene(){
   if (!gl) initGL();
   if (glFailed) return;
-  refreshColors(); refreshNumbers(); refreshBorders(); refreshStars(); refreshHighlights();
+  refreshColors(); refreshNumbers(); refreshBorders(); refreshUnits(); refreshStars(); refreshHighlights();
 }
 function onResize(){
   if (!gl) return;
