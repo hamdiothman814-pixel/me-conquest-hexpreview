@@ -158,24 +158,27 @@ function initGL(){
       vertexColors: true, side: THREE.DoubleSide}));
     bordersMesh.renderOrder = 4;
     scene.add(bordersMesh);
-    // ---- 3D unit figures (instanced primitive parts) ----
-    function partMesh(geo, hexColor){
+    // ---- 3D unit figures, chunky board-game style (instanced parts) ----
+    function partMesh(geo, hexColor, cap){
       const m = new THREE.InstancedMesh(geo,
-        new THREE.MeshLambertMaterial({color: hexColor}), N);
+        new THREE.MeshLambertMaterial({color: hexColor}), cap || N);
       m.count = 0;
       scene.add(m);
       return m;
     }
     const parts = {
-      solBody: partMesh(new THREE.CylinderGeometry(0.52, 0.66, 1.55, 6), 0xffffff),
-      solHead: partMesh(new THREE.SphereGeometry(0.40, 8, 6), 0xc68863),
-      solHelmet: partMesh(new THREE.SphereGeometry(0.48, 8, 5, 0, Math.PI * 2, 0, 1.85), 0xffffff),
-      tankHull: partMesh(new THREE.BoxGeometry(2.8, 0.78, 1.6), 0xffffff),
-      tankTurret: partMesh(new THREE.CylinderGeometry(0.70, 0.82, 0.52, 8), 0xffffff),
-      tankBarrel: partMesh(new THREE.CylinderGeometry(0.09, 0.11, 2.1, 5), 0xffffff),
-      artyBase: partMesh(new THREE.BoxGeometry(1.8, 0.42, 1.2), 0xffffff),
-      artyBarrel: partMesh(new THREE.CylinderGeometry(0.12, 0.16, 2.4, 5), 0x3d473a),
-      artyShield: partMesh(new THREE.BoxGeometry(1.55, 0.95, 0.14), 0xffffff),
+      solBody: partMesh(new THREE.CylinderGeometry(0.74, 0.95, 2.0, 7), 0xffffff, 2 * N),
+      solHead: partMesh(new THREE.SphereGeometry(0.52, 8, 6), 0xc68863, 2 * N),
+      solHelmet: partMesh(new THREE.SphereGeometry(0.67, 8, 5, 0, Math.PI * 2, 0, 1.7), 0xffffff, 2 * N),
+      solRifle: partMesh(new THREE.BoxGeometry(0.17, 1.7, 0.17), 0x2e2a24, 2 * N),
+      tankHull: partMesh(new THREE.BoxGeometry(6.8, 1.3, 3.2), 0xffffff),
+      tankTracks: partMesh(new THREE.BoxGeometry(6.4, 0.85, 0.75), 0x33302a, 2 * N),
+      tankTurret: partMesh(new THREE.CylinderGeometry(1.15, 1.38, 0.85, 8), 0xffffff),
+      tankBarrel: partMesh(new THREE.CylinderGeometry(0.13, 0.18, 3.6, 6), 0xffffff),
+      artyBase: partMesh(new THREE.BoxGeometry(3.4, 0.5, 2.2), 0xffffff),
+      artyWheel: partMesh(new THREE.CylinderGeometry(0.85, 0.85, 0.3, 9), 0x33302a, 2 * N),
+      artyShield: partMesh(new THREE.BoxGeometry(0.18, 1.9, 3.0), 0xffffff),
+      artyBarrel: partMesh(new THREE.CylinderGeometry(0.16, 0.23, 4.4, 6), 0x3d473a),
     };
     // ---- general stars ----
     const starMesh = new THREE.InstancedMesh(
@@ -316,43 +319,57 @@ function setInst(mesh, idx, x, y, z, rx, ry, rz){
 function refreshUnits(){
   if (!gl || !gl.parts) return;
   const P = gl.parts;
-  const counts = {solBody: 0, solHead: 0, solHelmet: 0, tankHull: 0, tankTurret: 0,
-                  tankBarrel: 0, artyBase: 0, artyBarrel: 0, artyShield: 0};
+  const counts = {solBody: 0, solHead: 0, solHelmet: 0, solRifle: 0,
+                  tankHull: 0, tankTracks: 0, tankTurret: 0, tankBarrel: 0,
+                  artyBase: 0, artyWheel: 0, artyShield: 0, artyBarrel: 0};
   const colTmp = new THREE.Color();
   function paint(mesh, idx, hex, mul){
     colTmp.set(hex);
     if (mul) colTmp.multiplyScalar(mul);
     mesh.setColorAt(idx, colTmp);
   }
+  function soldier(fx, fz, y, C){
+    let j = counts.solBody++;
+    setInst(P.solBody, j, fx, y + 1.55, fz, 0, 0, 0); paint(P.solBody, j, C.uniform, 1);
+    j = counts.solHead++;
+    setInst(P.solHead, j, fx, y + 2.85, fz, 0, 0, 0);
+    j = counts.solHelmet++;
+    setInst(P.solHelmet, j, fx, y + 2.98, fz, 0, 0, 0); paint(P.solHelmet, j, C.helmet, 1);
+    j = counts.solRifle++;
+    setInst(P.solRifle, j, fx + 0.62, y + 1.8, fz + 0.5, 0.55, 0, -0.25);
+  }
   for (let i = 0; i < N; i++){
     if (S.inf[i] + S.art[i] + S.tank[i] === 0) continue;
     const h = D.hexes[i], y = hTop(i), C = D.countries[S.owner[i]];
     if (S.tank[i] > 0){
-      const fx = h[0] - 3.3, fz = h[1] - 1.6;
-      let j = counts.tankHull++;
-      setInst(P.tankHull, j, fx, y + 0.62, fz, 0, 0, 0); paint(P.tankHull, j, C.uniform, 0.85);
+      const fx = h[0] - 3.4, fz = h[1] - 2.2;
+      let j = counts.tankTracks++;
+      setInst(P.tankTracks, j, fx, y + 0.43, fz - 1.28, 0, 0, 0);
+      j = counts.tankTracks++;
+      setInst(P.tankTracks, j, fx, y + 0.43, fz + 1.28, 0, 0, 0);
+      j = counts.tankHull++;
+      setInst(P.tankHull, j, fx, y + 1.05, fz, 0, 0, 0); paint(P.tankHull, j, C.uniform, 0.85);
       j = counts.tankTurret++;
-      setInst(P.tankTurret, j, fx - 0.25, y + 1.28, fz, 0, 0, 0); paint(P.tankTurret, j, C.uniform, 0.95);
+      setInst(P.tankTurret, j, fx - 0.55, y + 2.12, fz, 0, 0, 0); paint(P.tankTurret, j, C.uniform, 0.95);
       j = counts.tankBarrel++;
-      setInst(P.tankBarrel, j, fx + 1.35, y + 1.3, fz, 0, 0, Math.PI / 2); paint(P.tankBarrel, j, C.uniform, 0.7);
+      setInst(P.tankBarrel, j, fx + 2.35, y + 2.18, fz, 0, 0, Math.PI / 2); paint(P.tankBarrel, j, C.uniform, 0.7);
     }
     if (S.art[i] > 0){
-      const fx = h[0] + 3.4, fz = h[1] - 1.4;
+      const fx = h[0] + 3.1, fz = h[1] - 2.4;
       let j = counts.artyBase++;
-      setInst(P.artyBase, j, fx, y + 0.24, fz, 0, 0, 0); paint(P.artyBase, j, C.uniform, 0.75);
+      setInst(P.artyBase, j, fx, y + 0.5, fz, 0, 0, 0); paint(P.artyBase, j, C.uniform, 0.75);
+      j = counts.artyWheel++;
+      setInst(P.artyWheel, j, fx - 0.5, y + 0.85, fz - 1.22, Math.PI / 2, 0, 0);
+      j = counts.artyWheel++;
+      setInst(P.artyWheel, j, fx - 0.5, y + 0.85, fz + 1.22, Math.PI / 2, 0, 0);
       j = counts.artyShield++;
-      setInst(P.artyShield, j, fx - 0.55, y + 0.85, fz, 0, 0, 0); paint(P.artyShield, j, C.uniform, 0.9);
+      setInst(P.artyShield, j, fx + 0.55, y + 1.55, fz, 0, 0, -0.1); paint(P.artyShield, j, C.uniform, 0.9);
       j = counts.artyBarrel++;
-      setInst(P.artyBarrel, j, fx + 0.35, y + 1.25, fz, 0, 0, -0.85);
+      setInst(P.artyBarrel, j, fx + 1.15, y + 2.05, fz, 0, 0, -0.5);
     }
     if (S.inf[i] > 0){
-      const fx = h[0], fz = h[1] + 2.6;
-      let j = counts.solBody++;
-      setInst(P.solBody, j, fx, y + 1.0, fz, 0, 0, 0); paint(P.solBody, j, C.uniform, 1);
-      j = counts.solHead++;
-      setInst(P.solHead, j, fx, y + 2.05, fz, 0, 0, 0);
-      j = counts.solHelmet++;
-      setInst(P.solHelmet, j, fx, y + 2.14, fz, 0, 0, 0); paint(P.solHelmet, j, C.helmet, 1);
+      soldier(h[0] - 1.25, h[1] + 3.2, y, C);
+      soldier(h[0] + 1.35, h[1] + 4.3, y, C);
     }
   }
   for (const k in P){
